@@ -1,4 +1,4 @@
-#install microsite
+#install git for microsite
 
 apt-get install git
 #git-core on ubuntu 10.04
