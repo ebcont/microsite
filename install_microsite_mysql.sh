@@ -35,7 +35,7 @@ echo "#######################"
 echo "Thank you for input"
 echo "Installation begins in 10 seconds - this is your last chance to cancel"
 echo "Installation will need about 10 minutes - there is no more input necessary- if you don't see HAVE FUN as the last line of the installation, something went wrong. Then you have to start installation again."
-sleep 10
+sleep 5
 
 echo "edit basics"
 cat << EOF >> /root/.bashrc
@@ -45,11 +45,15 @@ alias msg='tail -f /var/log/messages'
 alias ..='cd ..'
 alias ...='cd ../..'
 alias qdu='du -h --max-depth=1'
+alias qifc='ifconfig | grep -B2 "inet addr"'
 EOF
 
 echo "do OS updates"
 apt-get -y update
 apt-get -y upgrade
+
+echo "install vim"
+apt-get -y install vim
 
 echo "install unzip - needed later"
 apt-get -y install unzip
@@ -61,6 +65,7 @@ echo "install and configure shorewall"
 apt-get -y install shorewall
 cp /usr/share/doc/shorewall/examples/one-interface/* /etc/shorewall/
 sed -i "s/startup=0/startup=1/g" /etc/default/shorewall
+cp /etc/shorewall/rules /etc/shorewall/rules.orig
 sed -i "s/Ping(DROP)/Ping(ACCEPT)/g" /etc/shorewall/rules
 cat << EOF >> /etc/shorewall/rules
 #added by script install_microsites.sh
@@ -140,7 +145,8 @@ Allow from 86.59.126.136/29
 # ADE Home
 Allow from 86.59.126.139
 
-# IP during installation
+# IP internal and Installation
+Allow from 192.168.56.0/24
 Allow from $xipaddress
 EOF
 
@@ -283,10 +289,7 @@ echo "testmessage from new installed microsites-server" | mail -s "testmail from
 
 echo "Install AWStats"
 mkdir -p /etc/apache2/auth/
-(echo -n "awstats:awstats:" && echo -n "awstats:awstats:$xawstatspassword" | md5sum | awk '
-
-Unknown macro: {print $1}
-' ) >> /etc/apache2/auth/stats-digest
+(echo -n "awstats:awstats:" && echo -n "awstats:awstats:$xawstatspassword" | md5sum | awk '{print $1}' ) >> /etc/apache2/auth/stats-digest
 apt-get -y install awstats
 cp /etc/awstats/awstats.conf /etc/awstats/awstats.$xdomain.conf
 sed -i "s#LogFile=\"/var/log/apache2/access.log\"#LogFile=\"/var/log/apache2/$xdomain-access.log\"#g" /etc/awstats/awstats.$xdomain.conf
@@ -296,6 +299,7 @@ cat << EOF >> /etc/crontab
 0 0 * * *    root    /usr/lib/cgi-bin/awstats.pl -config=$xdomain -update
 EOF
 service cron restart
+service apache2 restart
 
 echo "Install liferay"
 wget -P /root/install "http://optimate.dl.sourceforge.net/project/lportal/Liferay%20Portal/6.2.0%20GA1/liferay-portal-tomcat-6.2.0-ce-ga1-20131101192857659.zip"
@@ -370,10 +374,7 @@ export CATALINA_PID=/var/run/liferay/liferay.pid
 JVM_DIRS="/usr/lib/jvm/java-6-openjdk /usr/lib/jvm/java-6-sun /usr/lib/jvm/default-java /usr/lib/jvm/java-1.5.0-sun /usr/usr/lib/j2sdk1.5-sun /usr/lib/j2sdk1.5-ibm"
 if [ -z "\$JAVA_HOME" ]; then
         for jdir in \$JVM_DIRS; do
-                if [ -r "\$jdir/bin/java" -a -z "\$
-
-Unknown macro: {JAVA_HOME}
-" ]; then
+                if [ -r "\$jdir/bin/java" -a -z "\${JAVA_HOME}" ]; then
                         export JAVA_HOME="\$jdir"
                 fi
         done
@@ -481,10 +482,7 @@ case "\$1" in
         \$1
     ;;
     *)
-        echo \$"Usage: \$0
-
-Unknown macro: {start|stop|restart|status}
-"
+        echo \$"Usage: \$0{start|stop|restart|status}"
         exit 1
     ;;
 esac
