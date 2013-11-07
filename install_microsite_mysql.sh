@@ -314,6 +314,7 @@ schema.run.minimal=true
 web.server.host=$xdomain
 web.server.protocol=http
 web.server.http.port=80
+web.server.https.port=443
 EOF
 mysql -uroot -p$xmysqlpwd -e "create database lportal"
 
