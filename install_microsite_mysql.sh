@@ -98,12 +98,10 @@ tar xfvz /root/install/jdk-7u45-linux-x64.tar.gz -C /opt/
 ln -s /opt/jdk1.7.0_45/ /opt/java
 update-alternatives --install "/usr/bin/java" "java" "/opt/java/bin/java" 1
 export JAVA_HOME=/opt/java
-export JRE_HOME=$JAVA_HOME/jre
 export PATH=$PATH:$JAVA_HOME/bin
 cat << EOF >> /etc/profile
 #added by script install_microsites_mysql.sh
 export JAVA_HOME=/opt/java
-export JRE_HOME=\$JAVA_HOME/jre
 export PATH=\$PATH:\$JAVA_HOME/bin
 EOF
 
@@ -348,6 +346,7 @@ APP_NAME="Liferay 6.2.0"
  
 #Location of Liferay installation
 export LIFERAY_HOME=/opt/liferay
+export JAVA_HOME=/opt/java
 
 #unprivileged user that runs the daemon. The group/user should have been created separately,
 #using groupadd/useradd
@@ -482,7 +481,7 @@ case "\$1" in
         \$1
     ;;
     *)
-        echo \$"Usage: \$0{start|stop|restart|status}"
+        echo \$"Usage: \$0 {start|stop|restart|status}"
         exit 1
     ;;
 esac
