@@ -48,6 +48,9 @@ alias qdu='du -h --max-depth=1'
 alias qifc='ifconfig | grep -B2 "inet addr"'
 EOF
 
+echo "MOTD"
+echo $xdomain > /etc/motd.tail
+
 echo "do OS updates"
 apt-get -y update
 apt-get -y upgrade
@@ -187,6 +190,7 @@ cat << EOF > /etc/apache2/sites-available/$xdomain
         ProxyPass /awstatsclasses !
         ProxyPass /awstats-icon !
         ProxyPass /awstats-css !
+        ProxyPass /robots.txt !
  
         # Pass all other requests to tomcat
         ProxyPass / http://127.0.0.1:8080/
@@ -256,6 +260,13 @@ ln -s /etc/apache2/sites-available/$xdomain /etc/apache2/sites-enabled/
 rm /etc/apache2/sites-enabled/000-default
 service apache2 restart
 
+echo "robots.txt"
+cat << EOF >> /var/www/robots.txt
+#added by script install_microsites_mysql.sh
+User-agent: *
+Disallow:
+EOF
+
 echo "Setup mod_security"
 apt-get -y install libapache-mod-security
 cp /etc/modsecurity/modsecurity.conf-recommended /etc/modsecurity/modsecurity.conf
@@ -303,8 +314,9 @@ echo "Install liferay"
 wget -P /root/install "http://optimate.dl.sourceforge.net/project/lportal/Liferay%20Portal/6.2.0%20GA1/liferay-portal-tomcat-6.2.0-ce-ga1-20131101192857659.zip"
 unzip -d /opt/ /root/install/liferay-portal-tomcat-6.2.0-ce-ga1-20131101192857659.zip
 ln -s /opt/liferay-portal-6.2.0-ce-ga1/ /opt/liferay
-ln -s /opt/liferay/tomcat-7.0.42/logs/catalina.out /var/log/tomcat.log
-cat << EOF > /opt/liferay/tomcat-7.0.42/webapps/ROOT/WEB-INF/classes/portal-ext.properties
+ln -s /opt/liferay/tomcat* /opt/liferay/tomcat
+ln -s /opt/liferay/tomcat/logs/catalina.out /var/log/tomcat.log
+cat << EOF > /opt/liferay/tomcat/webapps/ROOT/WEB-INF/classes/portal-ext.properties
 jdbc.default.driverClassName=com.mysql.jdbc.Driver
 jdbc.default.url=jdbc:mysql://localhost/lportal?useUnicode=true&characterEncoding=UTF-8&useFastDateParsing=false
 jdbc.default.username=root
