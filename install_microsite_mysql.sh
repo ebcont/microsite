@@ -28,7 +28,7 @@ read xemailusername
 echo "Please enter your Gmail-Password for sending mails"
 echo -n "Gmail-Password: "
 read xemailpassword
-echo "Now please enter the password to access Awstats with user awstats under http://$xdomain/awstats"
+echo "Now please enter the password to access Awstats with user awstats under http://$xdomain/awstats/awstats.pl?config=$xdomain"
 echo -n "Awstats-Password: "
 read xawstatspassword
 echo "#######################"
@@ -49,7 +49,12 @@ alias qifc='ifconfig | grep -B2 "inet addr"'
 EOF
 
 echo "MOTD"
-echo $xdomain > /etc/motd.tail
+cat << EOF >> /etc/motd.tail
+######################
+EBCONT operations
+$xdomain
+######################
+EOF
 
 echo "do OS updates"
 apt-get -y update
@@ -90,8 +95,42 @@ ACCEPT        net:$xipaddress        \$FW    tcp        ssh
  
 # PUBLIC RULES PORT 80
 ACCEPT          net     \$FW     tcp     www
+
+# MONITORING
+ACCEPT          net:62.116.82.210/28    \$FW     tcp     10050
 EOF
 service shorewall restart
+
+echo "Install backup"
+mkdir -p /backup
+apt-get -y install git
+mkdir -p /root/bin/git/backup && cd /root/bin/git/backup && git init
+git --work-tree=/root/bin/git/backup/ --git-dir=/root/bin/git/backup/.git/ pull https://github.com/ebcont/backup.git
+cp /root/bin/git/backup/credentials /root/bin/ && chmod 700 /root/bin/credentials
+echo "#added by install_microsite.sh" >> /etc/crontab
+echo "10 0 * * *     root     ( cd /root/bin/git/backup/ && git --work-tree=/root/bin/git/backup/ --git-dir=/root/n/git/backup/.git/ pull https://github.com/ebcont/backup.git )" >> /etc/crontab
+cat << EOF >> /etc/logrotate.d/backup
+/var/log/*backup*.log {
+	weekly
+	missingok
+	rotate 52
+	compress
+	delaycompress
+	notifempty
+	create 640 root adm
+	sharedscripts
+	postrotate
+	endscript
+	prerotate
+	endscript
+}
+EOF
+
+echo "Install zabbix"
+wget -P /root/install "http://repo.zabbix.com/zabbix/2.0/ubuntu/pool/main/z/zabbix/zabbix-agent_2.0.8-1+precise_amd64.deb"
+dpkg -i /root/install/zabbix-agent_2.0.8-1+precise_amd64.deb
+sed -i s#Server=127.0.0.1#Server=62.116.82.210#g /etc/zabbix/zabbix_agentd.conf
+/etc/init.d/zabbix-agent restart
 
 echo "Install Sun JDK v1.7"
 #oracle wants you to accept license agreement - so we use cookies :-)
@@ -319,7 +358,7 @@ ln -s /opt/liferay/tomcat/logs/catalina.out /var/log/tomcat.log
 cat << EOF > /opt/liferay/tomcat/webapps/ROOT/WEB-INF/classes/portal-ext.properties
 jdbc.default.driverClassName=com.mysql.jdbc.Driver
 jdbc.default.url=jdbc:mysql://localhost/lportal?useUnicode=true&characterEncoding=UTF-8&useFastDateParsing=false
-jdbc.default.username=root
+jdbc.default.username=liferay
 jdbc.default.password=$xmysqlpwd
 schema.run.enabled=true
 schema.run.minimal=true
@@ -328,7 +367,9 @@ web.server.protocol=http
 web.server.http.port=80
 web.server.https.port=443
 EOF
-mysql -uroot -p$xmysqlpwd -e "create database lportal"
+mysql -uroot -p$xmysqlpwd -e "create database lportal default character set utf8;"
+mysql -uroot -p$xmysqlpwd -e "grant all on lportal.* to liferay@localhost identified by '$xmysqlpwd';"
+mysql -uroot -p$xmysqlpwd -e "flush privileges;"
 
 echo "Creating startup-script and user"
 adduser --shell /bin/bash --disabled-password --no-create-home --home /opt/liferay/ --gecos "Liferay,,," liferay
@@ -355,7 +396,7 @@ cat << EOF > /etc/init.d/liferay
 ### END INIT INFO
  
 #Display name of the application
-APP_NAME="Liferay 6.2.0"
+APP_NAME="Liferay"
  
 #Location of Liferay installation
 export LIFERAY_HOME=/opt/liferay
