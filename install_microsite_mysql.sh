@@ -75,6 +75,7 @@ cp /usr/share/doc/shorewall/examples/one-interface/* /etc/shorewall/
 sed -i "s/startup=0/startup=1/g" /etc/default/shorewall
 cp /etc/shorewall/rules /etc/shorewall/rules.orig
 sed -i "s/Ping(DROP)/Ping(ACCEPT)/g" /etc/shorewall/rules
+sed -i "s/eth0/venet0/g" /etc/shorewall/interfaces
 cat << EOF >> /etc/shorewall/rules
 #added by script install_microsites.sh
 # MAINTENANCE
@@ -192,10 +193,17 @@ EOF
 
 echo "Configure Apache2"
 cp /etc/apache2/sites-available/default /etc/apache2/sites-available/default.orig
+echo "ServerName localhost" >> /etc/apache2/httpd.conf
+sed -i "s#MaxClients        10#MaxClients        25#g" /etc/apache2/apache2.conf
 cat << EOF > /etc/apache2/sites-available/$xdomain
-
 <VirtualHost *:80>
-        NameVirtualHost $xdomain:80
+	ServerName domain1.at
+	ServerAlias domain2.at
+        ServerAdmin hostmaster@$xdomain
+        Redirect 301 / http://$xdomain/
+</VirtualHost>
+<VirtualHost *:80>
+		ServerName $xdomain
         ServerAdmin webmaster@$xdomain
  
         DocumentRoot /var/www
@@ -315,6 +323,7 @@ service apache2 restart
 echo "Install SMTP and postfix for using gmail"
 export DEBIAN_FRONTEND=noninteractive
 apt-get -y install postfix
+apt-get -y install libsasl2-modules
 sed -i "s/inet_interfaces/#inet_interfaces/g" /etc/postfix/main.cf
 sed -i "s/relayhost/#relayhost/g" /etc/postfix/main.cf
 cat << EOF >> /etc/postfix/main.cf
@@ -338,6 +347,7 @@ echo "testmessage from new installed microsites-server" | mail -s "testmail from
 echo "Install AWStats"
 mkdir -p /etc/apache2/auth/
 (echo -n "awstats:awstats:" && echo -n "awstats:awstats:$xawstatspassword" | md5sum | awk '{print $1}' ) >> /etc/apache2/auth/stats-digest
+(echo -n "awstats:awstats:" && echo -n "awstats:awstats:$xawstatspassword" | md5sum | awk '{print $1}' ) >> /etc/apache2/auth/site-basic
 apt-get -y install awstats
 cp /etc/awstats/awstats.conf /etc/awstats/awstats.$xdomain.conf
 sed -i "s#LogFile=\"/var/log/apache2/access.log\"#LogFile=\"/var/log/apache2/$xdomain-access.log\"#g" /etc/awstats/awstats.$xdomain.conf
