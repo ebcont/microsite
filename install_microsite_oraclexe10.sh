@@ -96,38 +96,24 @@ apt-get -y install unzip
 echo "install chkconfig - who can work without it?"
 apt-get -y install chkconfig
 
-echo "install and configure shorewall"
-apt-get -y install shorewall
-cp /usr/share/doc/shorewall/examples/one-interface/* /etc/shorewall/
-sed -i "s/startup=0/startup=1/g" /etc/default/shorewall
-cp /etc/shorewall/rules /etc/shorewall/rules.orig
-sed -i "s/Ping(DROP)/Ping(ACCEPT)/g" /etc/shorewall/rules
-sed -i "s/eth0/$xinterface/g" /etc/shorewall/interfaces
-cat << EOF >> /etc/shorewall/rules
-#added by script install_microsites.sh
-# MAINTENANCE
- 
-# ECBONT Office
-ACCEPT          net:188.21.79.96/29     \$FW     tcp     ssh
-ACCEPT          net:62.116.82.210/28    \$FW     tcp     ssh
- 
-# ADE Home
-ACCEPT          net:86.59.126.136/29    \$FW     tcp     ssh
-# internal
-ACCEPT        net:10.0.2.0/24    \$FW    tcp        ssh
-ACCEPT        net:$xipaddress        \$FW    tcp        ssh
- 
-# INTERNAL TESTING
-#ACCEPT          net:188.21.79.96/29     \$FW     tcp     www
-#ACCEPT          net:86.59.126.136/29    \$FW     tcp     www
- 
-# PUBLIC RULES PORT 80
-ACCEPT          net     \$FW     tcp     www
-
-# MONITORING
-ACCEPT          net:62.116.82.210/28    \$FW     tcp     10050
-EOF
-service shorewall restart
+echo "install and configure ufw"
+apt-get -y install ufw
+ufw logging low
+ufw default deny incoming
+ufw default allow outgoing
+# ssh internal
+ufw allow proto tcp from 10.0.2.0/24 to any port 22
+ufw allow proto tcp from $xipaddress to any port 22
+# ssh EBCONT office
+ufw allow proto tcp from 188.21.79.96/29 to any port 22
+ufw allow proto tcp from 62.116.82.210/28 to any port 22
+# ssh ADE home
+ufw allow proto tcp from 86.59.126.136/29 to any port 22
+# zabbix monitoring
+ufw allow proto tcp from 62.116.82.210/28 to any port 22
+# apache
+ufw allow 80/tcp 
+ufw --force enable
 
 echo "Install backup"
 mkdir -p /backup

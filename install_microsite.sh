@@ -10,6 +10,13 @@ echo "Setup will begin now - if you want to skip Ctrl+C"
 sleep 15
 echo "Before we can begin, we need some information"
 echo "#######################"
+
+xinstalldef="mysql"
+echo -e "Do you want to run your microsite with mysql (and shorewall) or oracleXE10 (and ufw) - (mysql or oracle10)"
+echo -n "Installationtype [$xinstalldef]: "
+read xinstall
+[ -z "$xinstall" ] && xinstall=$xinstalldef
+
 xinterfacedef="eth0"
 echo -e "Please enter the name of the main-interace which should be used for iptables? (eg eth0 or venet0)"
 echo -n "Interface [$xinterfacedef]: "
@@ -96,38 +103,62 @@ apt-get -y install unzip
 echo "install chkconfig - who can work without it?"
 apt-get -y install chkconfig
 
-echo "install and configure shorewall"
-apt-get -y install shorewall
-cp /usr/share/doc/shorewall/examples/one-interface/* /etc/shorewall/
-sed -i "s/startup=0/startup=1/g" /etc/default/shorewall
-cp /etc/shorewall/rules /etc/shorewall/rules.orig
-sed -i "s/Ping(DROP)/Ping(ACCEPT)/g" /etc/shorewall/rules
-sed -i "s/eth0/$xinterface/g" /etc/shorewall/interfaces
-cat << EOF >> /etc/shorewall/rules
-#added by script install_microsites.sh
-# MAINTENANCE
- 
-# ECBONT Office
-ACCEPT          net:188.21.79.96/29     \$FW     tcp     ssh
-ACCEPT          net:62.116.82.210/28    \$FW     tcp     ssh
- 
-# ADE Home
-ACCEPT          net:86.59.126.136/29    \$FW     tcp     ssh
-# internal
-ACCEPT        net:10.0.2.0/24    \$FW    tcp        ssh
-ACCEPT        net:$xipaddress        \$FW    tcp        ssh
- 
-# INTERNAL TESTING
-#ACCEPT          net:188.21.79.96/29     \$FW     tcp     www
-#ACCEPT          net:86.59.126.136/29    \$FW     tcp     www
- 
-# PUBLIC RULES PORT 80
-ACCEPT          net     \$FW     tcp     www
 
-# MONITORING
-ACCEPT          net:62.116.82.210/28    \$FW     tcp     10050
-EOF
-service shorewall restart
+if [ $xinstall='mysql' ]
+then
+   echo "install and configure shorewall"
+   apt-get -y install shorewall
+   cp /usr/share/doc/shorewall/examples/one-interface/* /etc/shorewall/
+   sed -i "s/startup=0/startup=1/g" /etc/default/shorewall
+   cp /etc/shorewall/rules /etc/shorewall/rules.orig
+   sed -i "s/Ping(DROP)/Ping(ACCEPT)/g" /etc/shorewall/rules
+   sed -i "s/eth0/$xinterface/g" /etc/shorewall/interfaces
+   cat << EOF >> /etc/shorewall/rules
+   #added by script install_microsites.sh
+   # MAINTENANCE
+    
+   # ECBONT Office
+   ACCEPT          net:188.21.79.96/29     \$FW     tcp     ssh
+   ACCEPT          net:62.116.82.210/28    \$FW     tcp     ssh
+    
+   # ADE Home
+   ACCEPT          net:86.59.126.136/29    \$FW     tcp     ssh
+   # internal
+   ACCEPT        net:10.0.2.0/24    \$FW    tcp        ssh
+   ACCEPT        net:$xipaddress        \$FW    tcp        ssh
+    
+   # INTERNAL TESTING
+   #ACCEPT          net:188.21.79.96/29     \$FW     tcp     www
+   #ACCEPT          net:86.59.126.136/29    \$FW     tcp     www
+    
+   # PUBLIC RULES PORT 80
+   ACCEPT          net     \$FW     tcp     www
+   
+   # MONITORING
+   ACCEPT          net:62.116.82.210/28    \$FW     tcp     10050
+   EOF
+   service shorewall restart
+else
+   echo "install and configure ufw"
+   apt-get -y install ufw
+   ufw logging low
+   ufw default deny incoming
+   ufw default allow outgoing
+   # ssh internal
+   ufw allow proto tcp from 10.0.2.0/24 to any port 22
+   ufw allow proto tcp from $xipaddress to any port 22
+   # ssh EBCONT office
+   ufw allow proto tcp from 188.21.79.96/29 to any port 22
+   ufw allow proto tcp from 62.116.82.210/28 to any port 22
+   # ssh ADE home
+   ufw allow proto tcp from 86.59.126.136/29 to any port 22
+   # zabbix monitoring
+   ufw allow proto tcp from 62.116.82.210/28 to any port 22
+   # apache
+   ufw allow 80/tcp 
+   ufw --force enable
+fi
+
 
 echo "Install backup"
 mkdir -p /backup
@@ -175,11 +206,38 @@ export JAVA_HOME=/opt/java
 export PATH=\$PATH:\$JAVA_HOME/bin
 EOF
 
-echo "Install Mysql"
-#this is needed to NOT prompt the root-pwd while installing
-echo mysql-server-5.5 mysql-server/root_password password $xmysqlpwd | debconf-set-selections
-echo mysql-server-5.5 mysql-server/root_password_again password $xmysqlpwd | debconf-set-selections
-apt-get -y install mysql-server
+if [ $xinstall='mysql' ]
+then
+   echo "Install Mysql"
+   #this is needed to NOT prompt the root-pwd while installing
+   echo mysql-server-5.5 mysql-server/root_password password $xmysqlpwd | debconf-set-selections
+   echo mysql-server-5.5 mysql-server/root_password_again password $xmysqlpwd | debconf-set-selections
+   apt-get -y install mysql-server
+else
+   echo "Install Oracle XE 10"
+   wget -P /root/install "http://oss.oracle.com/debian/dists/unstable/non-free/binary-i386/oracle-xe-universal_10.2.0.1-1.1_i386.deb"
+   wget -P /root/install "http://oss.oracle.com/debian/dists/unstable/main/binary-i386/libaio_0.3.104-1_i386.deb"
+   dpkg -i --force-architecture /root/install/libaio_0.3.104-1_i386.deb
+   dpkg -i --force-architecture /root/install/oracle-xe-universal_10.2.0.1-1.1_i386.deb
+   echo "now you have to do something manual - please use 1521 as port"
+   sleep 10
+   /etc/init.d/oracle-xe configure
+   echo "thank you for your input"
+   sleep 5
+   cat << EOF >> /etc/profile
+     ORACLE_HOME=/usr/lib/oracle/xe/app/oracle/product/10.2.0/server
+     PATH=$PATH:$ORACLE_HOME/bin
+     export ORACLE_HOME
+     export ORACLE_SID=XE
+     export PATH
+   EOF
+   ORACLE_HOME=/usr/lib/oracle/xe/app/oracle/product/10.2.0/server
+   PATH=$PATH:$ORACLE_HOME/bin
+   export ORACLE_HOME
+   export ORACLE_SID=XE
+   export PATH
+fi
+
 
 echo "Install Apache2"
 apt-get -y install apache2
@@ -392,21 +450,47 @@ unzip -d /opt/ /root/install/liferay-portal-tomcat-6.2.0-ce-ga1-2013110119285765
 ln -s /opt/liferay-portal-6.2.0-ce-ga1/ /opt/liferay
 ln -s /opt/liferay/tomcat* /opt/liferay/tomcat
 ln -s /opt/liferay/tomcat/logs/catalina.out /var/log/tomcat.log
-cat << EOF > /opt/liferay/tomcat/webapps/ROOT/WEB-INF/classes/portal-ext.properties
-jdbc.default.driverClassName=com.mysql.jdbc.Driver
-jdbc.default.url=jdbc:mysql://localhost/lportal?useUnicode=true&characterEncoding=UTF-8&useFastDateParsing=false
-jdbc.default.username=liferay
-jdbc.default.password=$xmysqlpwd
-schema.run.enabled=true
-schema.run.minimal=true
-web.server.host=$xdomain
-web.server.protocol=http
-web.server.http.port=80
-web.server.https.port=443
-EOF
-mysql -uroot -p$xmysqlpwd -e "create database lportal default character set utf8;"
-mysql -uroot -p$xmysqlpwd -e "grant all on lportal.* to liferay@localhost identified by '$xmysqlpwd';"
-mysql -uroot -p$xmysqlpwd -e "flush privileges;"
+
+if [ $xinstall='mysql' ]
+then
+   cat << EOF > /opt/liferay/tomcat/webapps/ROOT/WEB-INF/classes/portal-ext.properties
+   jdbc.default.driverClassName=com.mysql.jdbc.Driver
+   jdbc.default.url=jdbc:mysql://localhost/lportal?useUnicode=true&characterEncoding=UTF-8&useFastDateParsing=false
+   jdbc.default.username=liferay
+   jdbc.default.password=$xmysqlpwd
+   #jdbc.default.driverClassName=oracle.jdbc.driver.OracleDriver
+   #jdbc.default.url=jdbc:oracle:thin:@localhost:1521:xe
+   #jdbc.default.username=liferay_db
+   #jdbc.default.password=password123
+   schema.run.enabled=true
+   schema.run.minimal=true
+   web.server.host=$xdomain
+   web.server.protocol=http
+   web.server.http.port=80
+   web.server.https.port=443
+   EOF
+   mysql -uroot -p$xmysqlpwd -e "create database lportal default character set utf8;"
+   mysql -uroot -p$xmysqlpwd -e "grant all on lportal.* to liferay@localhost identified by '$xmysqlpwd';"
+   mysql -uroot -p$xmysqlpwd -e "flush privileges;"
+else
+   cat << EOF > /opt/liferay/tomcat/webapps/ROOT/WEB-INF/classes/portal-ext.properties
+   #jdbc.default.driverClassName=com.mysql.jdbc.Driver
+   #jdbc.default.url=jdbc:mysql://localhost/lportal?useUnicode=true&characterEncoding=UTF-8&useFastDateParsing=false
+   #jdbc.default.username=liferay
+   #jdbc.default.password=password123
+   jdbc.default.driverClassName=oracle.jdbc.driver.OracleDriver
+   jdbc.default.url=jdbc:oracle:thin:@localhost:1521:xe
+   jdbc.default.username=liferay_db
+   jdbc.default.password=$xmysqlpwd
+   schema.run.enabled=true
+   schema.run.minimal=true
+   web.server.host=$xdomain
+   web.server.protocol=http
+   web.server.http.port=80
+   web.server.https.port=443
+   EOF
+   cp /usr/lib/oracle/xe/app/oracle/product/10.2.0/server/jdbc/lib/* /opt/liferay/tomcat/lib/ext/
+fi
 
 echo "Creating startup-script and user"
 adduser --shell /bin/bash --disabled-password --no-create-home --home /opt/liferay/ --gecos "Liferay,,," liferay
