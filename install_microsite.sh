@@ -41,7 +41,7 @@ echo -n "Your e-mail-Adress [$xemaildef]: "
 read xemail
 [ -z "$xemail" ] && xemail=$xemaildef
 
-xipaddressdef="1.2.3.4"
+xipaddressdef="10.0.2.2"
 echo -e "Please enter your local IP-address - we will allow ssh-connections from this IP-address (eg 194.166.221.74)"
 echo -n "IP-Adress [$xipaddressdef]: "
 read xipaddress
@@ -104,8 +104,7 @@ echo "install chkconfig - who can work without it?"
 apt-get -y install chkconfig
 
 
-if [ $xinstall='mysql' ]
-then
+if [ $xinstall='mysql' ]; then
    echo "install and configure shorewall"
    apt-get -y install shorewall
    cp /usr/share/doc/shorewall/examples/one-interface/* /etc/shorewall/
@@ -136,7 +135,7 @@ then
    
    # MONITORING
    ACCEPT          net:62.116.82.210/28    \$FW     tcp     10050
-   EOF
+EOF
    service shorewall restart
 else
    echo "install and configure ufw"
@@ -206,8 +205,7 @@ export JAVA_HOME=/opt/java
 export PATH=\$PATH:\$JAVA_HOME/bin
 EOF
 
-if [ $xinstall='mysql' ]
-then
+if [ $xinstall='mysql' ]; then
    echo "Install Mysql"
    #this is needed to NOT prompt the root-pwd while installing
    echo mysql-server-5.5 mysql-server/root_password password $xmysqlpwd | debconf-set-selections
@@ -230,7 +228,7 @@ else
      export ORACLE_HOME
      export ORACLE_SID=XE
      export PATH
-   EOF
+EOF
    ORACLE_HOME=/usr/lib/oracle/xe/app/oracle/product/10.2.0/server
    PATH=$PATH:$ORACLE_HOME/bin
    export ORACLE_HOME
@@ -451,8 +449,7 @@ ln -s /opt/liferay-portal-6.2.0-ce-ga1/ /opt/liferay
 ln -s /opt/liferay/tomcat* /opt/liferay/tomcat
 ln -s /opt/liferay/tomcat/logs/catalina.out /var/log/tomcat.log
 
-if [ $xinstall='mysql' ]
-then
+if [ $xinstall='mysql' ]; then
    cat << EOF > /opt/liferay/tomcat/webapps/ROOT/WEB-INF/classes/portal-ext.properties
    jdbc.default.driverClassName=com.mysql.jdbc.Driver
    jdbc.default.url=jdbc:mysql://localhost/lportal?useUnicode=true&characterEncoding=UTF-8&useFastDateParsing=false
@@ -468,7 +465,7 @@ then
    web.server.protocol=http
    web.server.http.port=80
    web.server.https.port=443
-   EOF
+EOF
    mysql -uroot -p$xmysqlpwd -e "create database lportal default character set utf8;"
    mysql -uroot -p$xmysqlpwd -e "grant all on lportal.* to liferay@localhost identified by '$xmysqlpwd';"
    mysql -uroot -p$xmysqlpwd -e "flush privileges;"
@@ -488,7 +485,7 @@ else
    web.server.protocol=http
    web.server.http.port=80
    web.server.https.port=443
-   EOF
+EOF
    cp /usr/lib/oracle/xe/app/oracle/product/10.2.0/server/jdbc/lib/* /opt/liferay/tomcat/lib/ext/
 fi
 
