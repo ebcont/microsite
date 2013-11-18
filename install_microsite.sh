@@ -12,7 +12,7 @@ echo "Before we can begin, we need some information"
 echo "#######################"
 
 xinstalldef="oracle10"
-echo -e "Do you want to run your microsite with mysql (and shorewall) or oracleXE10 (and ufw) - (mysql or oracle10)"
+echo -e "Do you want to run your microsite with mysql (and shorewall) or oracleXE10 (and iptables without shorewall) - (mysql or oracle10)"
 echo -n "Installationtype [$xinstalldef]: "
 read xinstall
 [ -z "$xinstall" ] && xinstall=$xinstalldef
@@ -30,8 +30,8 @@ read xdomain
 [ -z "$xdomain" ] && xdomain=$xdomaindef
 
 xmysqlpwddef="12345678"
-echo -e "Please enter a password, which should be used for root-access of the mysql-database"
-echo -n "Mysql-Password [$xmysqlpwddef]: "
+echo -e "Please enter a password, which should be used for root-access of the mysql-database or Oracle-DB"
+echo -n "Database-Password [$xmysqlpwddef]: "
 read xmysqlpwd
 [ -z "$xmysqlpwd" ] && xmysqlpwd=$xmysqlpwddef
 
@@ -100,58 +100,60 @@ apt-get -y install vim
 echo "install unzip - needed later"
 apt-get -y install unzip
 
-if [ $xinstall = 'mysql' ]; then
-   echo "install and configure shorewall"
-   apt-get -y install shorewall
-   cp /usr/share/doc/shorewall/examples/one-interface/* /etc/shorewall/
-   sed -i "s/startup=0/startup=1/g" /etc/default/shorewall
-   cp /etc/shorewall/rules /etc/shorewall/rules.orig
-   sed -i "s/Ping(DROP)/Ping(ACCEPT)/g" /etc/shorewall/rules
-   sed -i "s/eth0/$xinterface/g" /etc/shorewall/interfaces
-   cat << EOF >> /etc/shorewall/rules
-   #added by script install_microsites.sh
-   # MAINTENANCE
-    
-   # ECBONT Office
-   ACCEPT          net:188.21.79.96/29     \$FW     tcp     ssh
-   ACCEPT          net:62.116.82.210/28    \$FW     tcp     ssh
-    
-   # ADE Home
-   ACCEPT          net:86.59.126.136/29    \$FW     tcp     ssh
-   # internal
-   ACCEPT        net:10.0.2.0/24    \$FW    tcp        ssh
-   ACCEPT        net:$xipaddress        \$FW    tcp        ssh
-    
-   # INTERNAL TESTING
-   #ACCEPT          net:188.21.79.96/29     \$FW     tcp     www
-   #ACCEPT          net:86.59.126.136/29    \$FW     tcp     www
-    
-   # PUBLIC RULES PORT 80
-   ACCEPT          net     \$FW     tcp     www
+echo "install syslog-ng"
+apt-get -y purge rsyslog
+apt-get -y install syslog-ng
+
+echo "install and configure shorewall"
+apt-get --remove --purge -y ufw
+apt-get -y install shorewall
+cp /usr/share/doc/shorewall/examples/one-interface/* /etc/shorewall/
+sed -i "s/startup=0/startup=1/g" /etc/default/shorewall
+cp /etc/shorewall/rules /etc/shorewall/rules.orig
+sed -i "s/Ping(DROP)/Ping(ACCEPT)/g" /etc/shorewall/rules
+sed -i "s/eth0/$xinterface/g" /etc/shorewall/interfaces
+cat << EOF >> /etc/shorewall/rules
+#added by script install_microsites.sh
+# MAINTENANCE
    
-   # MONITORING
-   ACCEPT          net:62.116.82.210/28    \$FW     tcp     10050
+# ECBONT Office
+ACCEPT          net:188.21.79.96/29     \$FW     tcp     ssh
+ACCEPT          net:62.116.82.210/28    \$FW     tcp     ssh
+  
+# ADE Home
+ACCEPT          net:86.59.126.136/29    \$FW     tcp     ssh
+# internal
+ACCEPT        net:10.0.2.0/24    \$FW    tcp        ssh
+ACCEPT        net:$xipaddress        \$FW    tcp        ssh
+    
+# INTERNAL TESTING
+#ACCEPT          net:188.21.79.96/29     \$FW     tcp     www
+#ACCEPT          net:86.59.126.136/29    \$FW     tcp     www
+  
+# PUBLIC RULES PORT 80
+ACCEPT          net     \$FW     tcp     www
+   
+# MONITORING
+ACCEPT          net:62.116.82.210/28    \$FW     tcp     10050
 EOF
-   service shorewall restart
-else
-   echo "install and configure ufw"
-   apt-get -y install ufw
-   ufw logging low
-   ufw default deny incoming
-   ufw default allow outgoing
-   # ssh internal
-   ufw allow proto tcp from 10.0.2.0/24 to any port 22
-   ufw allow proto tcp from $xipaddress to any port 22
-   # ssh EBCONT office
-   ufw allow proto tcp from 188.21.79.96/29 to any port 22
-   ufw allow proto tcp from 62.116.82.210/28 to any port 22
-   # ssh ADE home
-   ufw allow proto tcp from 86.59.126.136/29 to any port 22
-   # zabbix monitoring
-   ufw allow proto tcp from 62.116.82.210/28 to any port 22
-   # apache
-   ufw allow 80/tcp 
-   ufw --force enable
+service shorewall restart
+
+
+#if we install oracle10 we cannot use shorewall - we have to use iptables without shorewall
+if [ $xinstall = 'oracle10' ]; then
+iptables-save > /etc/iptables.orig
+iptables-save > /etc/iptables.conf
+apt-get remove --purge -y shorewall
+apt-get remove --purge -y bc
+iptables-restore < /etc/iptables.conf
+#catch iptables-init-script
+apt-get -y install git
+mkdir -p /root/bin/git/microsite && cd /root/bin/git/microsite && git init
+git --work-tree=/root/bin/git/microsite/ --git-dir=/root/bin/git/microsite/.git/ pull https://github.com/ebcont/microsite.git
+cp /root/bin/git/microsite/iptables_init.sh /etc/init.d/iptables
+chmod 755 /etc/init.d/iptables
+update-rc.d iptables defaults
+/etc/init.d/iptables start
 fi
 
 
@@ -213,6 +215,8 @@ else
    wget -P /root/install "http://oss.oracle.com/debian/dists/unstable/main/binary-i386/libaio_0.3.104-1_i386.deb"
    dpkg -i --force-architecture /root/install/libaio_0.3.104-1_i386.deb
    dpkg -i --force-architecture /root/install/oracle-xe-universal_10.2.0.1-1.1_i386.deb
+   apt-get -fy install
+   apt-get -fy install
    echo "now you have to do something manual - please use 1521 as port"
    sleep 10
    /etc/init.d/oracle-xe configure
