@@ -11,7 +11,7 @@ sleep 15
 echo "Before we can begin, we need some information"
 echo "#######################"
 
-xinstalldef="mysql"
+xinstalldef="oracle10"
 echo -e "Do you want to run your microsite with mysql (and shorewall) or oracleXE10 (and ufw) - (mysql or oracle10)"
 echo -n "Installationtype [$xinstalldef]: "
 read xinstall
@@ -100,11 +100,7 @@ apt-get -y install vim
 echo "install unzip - needed later"
 apt-get -y install unzip
 
-echo "install chkconfig - who can work without it?"
-apt-get -y install chkconfig
-
-
-if [ $xinstall='mysql' ]; then
+if [ $xinstall = 'mysql' ]; then
    echo "install and configure shorewall"
    apt-get -y install shorewall
    cp /usr/share/doc/shorewall/examples/one-interface/* /etc/shorewall/
@@ -205,7 +201,7 @@ export JAVA_HOME=/opt/java
 export PATH=\$PATH:\$JAVA_HOME/bin
 EOF
 
-if [ $xinstall='mysql' ]; then
+if [ $xinstall = 'mysql' ]; then
    echo "Install Mysql"
    #this is needed to NOT prompt the root-pwd while installing
    echo mysql-server-5.5 mysql-server/root_password password $xmysqlpwd | debconf-set-selections
@@ -449,7 +445,7 @@ ln -s /opt/liferay-portal-6.2.0-ce-ga1/ /opt/liferay
 ln -s /opt/liferay/tomcat* /opt/liferay/tomcat
 ln -s /opt/liferay/tomcat/logs/catalina.out /var/log/tomcat.log
 
-if [ $xinstall='mysql' ]; then
+if [ $xinstall = 'mysql' ]; then
    cat << EOF > /opt/liferay/tomcat/webapps/ROOT/WEB-INF/classes/portal-ext.properties
    jdbc.default.driverClassName=com.mysql.jdbc.Driver
    jdbc.default.url=jdbc:mysql://localhost/lportal?useUnicode=true&characterEncoding=UTF-8&useFastDateParsing=false
