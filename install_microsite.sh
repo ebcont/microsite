@@ -100,10 +100,6 @@ apt-get -y install vim
 echo "install unzip - needed later"
 apt-get -y install unzip
 
-echo "install syslog-ng"
-apt-get -y purge rsyslog
-apt-get -y install syslog-ng
-
 echo "install and configure shorewall"
 apt-get --remove --purge -y ufw
 apt-get -y install shorewall
@@ -217,14 +213,14 @@ else
    dpkg -i --force-architecture /root/install/oracle-xe-universal_10.2.0.1-1.1_i386.deb
    apt-get -fy install
    apt-get -fy install
-   echo "now you have to do something manual - please use 1521 as port"
+   echo "now you have to do something manual - please do not use port 8080 for http because we will ned it for tomcat - use port 1500 instead"
    sleep 10
    /etc/init.d/oracle-xe configure
    echo "thank you for your input"
    sleep 5
    cat << EOF >> /etc/profile
      ORACLE_HOME=/usr/lib/oracle/xe/app/oracle/product/10.2.0/server
-     PATH=$PATH:$ORACLE_HOME/bin
+     PATH=\$PATH:\$ORACLE_HOME/bin
      export ORACLE_HOME
      export ORACLE_SID=XE
      export PATH
@@ -235,7 +231,6 @@ EOF
    export ORACLE_SID=XE
    export PATH
 fi
-
 
 echo "Install Apache2"
 apt-get -y install apache2
